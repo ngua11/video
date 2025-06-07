@@ -1,23 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Film, Sparkles, Loader, Clapperboard, Download } from 'lucide-react';
 
-// --- Helper Functions & Simulation Data ---
+// --- Cấu hình địa chỉ máy chủ ---
+// QUAN TRỌNG: Đây là nơi bạn sẽ kết nối giao diện này với máy chủ (backend).
+// 1. Khi chạy thử trên máy tính, hãy để là 'http://localhost:3001'.
+// 2. Trước khi triển khai lên Vercel, bạn PHẢI triển khai máy chủ lên một dịch vụ như Render,
+//    sau đó lấy URL của máy chủ đó và thay thế vào đây.
+//    Ví dụ: const SERVER_URL = 'https://your-server-name.onrender.com';
+const SERVER_URL = 'http://localhost:3001';
 
-// This function simulates the AI breaking down a main prompt into smaller scenes.
-const generateScenesFromPrompt = (prompt) => {
-    if (!prompt) return [];
-    // A more advanced AI would use NLP. Here, we split by commas or sentences.
-    const parts = prompt.split(/[,.।;]/).filter(p => p.trim().length > 3);
-    if (parts.length === 0) parts.push(prompt); // Use the whole prompt if no separators
-
-    return parts.map((part, i) => ({
-        id: `scene_${Date.now()}_${i}`,
-        description: `Cảnh ${i + 1}: ${part.trim()}`,
-        status: 'pending', // 'pending', 'generating', 'done', 'error'
-        thumbnailUrl: `https://placehold.co/400x225/1a1a1a/444444?text=Chờ+tạo...`,
-        videoUrl: null,
-    }));
-};
 
 // --- Main App Component ---
 export default function App() {
@@ -32,49 +23,45 @@ export default function App() {
 
         setIsProcessing(true);
         setFinalVideo(null);
-        
-        // 1. Deconstruct Prompt into Scenes
-        setCurrentStatus('Đang phân tích ý tưởng và chia thành các phân cảnh...');
-        const initialScenes = generateScenesFromPrompt(mainPrompt);
-        setScenes(initialScenes);
-        await new Promise(res => setTimeout(res, 1500));
+        setScenes([]);
+        setCurrentStatus('Đang gửi yêu cầu đến máy chủ AI...');
 
-        // 2. Generate each scene sequentially
-        const generatedScenes = [];
-        for (let i = 0; i < initialScenes.length; i++) {
-            const currentScene = initialScenes[i];
+        try {
+            // Gọi đến API của máy chủ thay vì mô phỏng
+            const response = await fetch(`${SERVER_URL}/api/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ prompt: mainPrompt }),
+            });
+
+            if (!response.ok) {
+                // Ném lỗi nếu máy chủ trả về mã lỗi (như 404, 500)
+                throw new Error(`Lỗi từ máy chủ: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
             
-            // Update scene status to 'generating'
-            setScenes(prev => prev.map(s => s.id === currentScene.id ? { ...s, status: 'generating' } : s));
-            setCurrentStatus(`Đang tạo [Cảnh ${i + 1}/${initialScenes.length}]: ${currentScene.description.split(': ')[1]}`);
+            setCurrentStatus('Máy chủ đã xử lý xong! Đang hiển thị kết quả...');
             
-            // Simulate generation time
-            await new Promise(res => setTimeout(res, 2000 + Math.random() * 1500));
+            // Cập nhật giao diện với dữ liệu nhận được từ máy chủ
+            setScenes(data.clips || []);
+            setFinalVideo({
+                url: data.finalVideoUrl,
+                title: mainPrompt
+            });
+            
+            setCurrentStatus('Hoàn tất! Video của bạn đã sẵn sàng để xem.');
 
-            const newSceneData = {
-                ...currentScene,
-                status: 'done',
-                thumbnailUrl: `https://placehold.co/400x225/3a3a9a/ffffff?text=${encodeURIComponent(`Cảnh ${i+1} OK`)}`,
-                videoUrl: `https://placehold.co/1280x720/1e1e5e/ffffff?text=${encodeURIComponent(currentScene.description)}`
-            };
-            generatedScenes.push(newSceneData);
-
-            // Update scene status to 'done'
-            setScenes(prev => prev.map(s => s.id === currentScene.id ? newSceneData : s));
+        } catch (error) {
+            console.error('Không thể kết nối hoặc xử lý yêu cầu:', error);
+            setCurrentStatus(`Gặp lỗi: ${error.message}. Hãy chắc chắn máy chủ đang hoạt động và địa chỉ được cấu hình đúng.`);
+            setScenes([]);
+            setFinalVideo(null);
+        } finally {
+            setIsProcessing(false);
         }
-
-        // 3. Stitching the final video
-        setCurrentStatus('Tất cả các cảnh đã xong. Đang ghép thành một video duy nhất...');
-        await new Promise(res => setTimeout(res, 2500));
-        
-        const finalVideoData = {
-            url: `https://placehold.co/1280x720/000000/ffffff?text=${encodeURIComponent('Video Hoàn Chỉnh: ' + mainPrompt)}`,
-            title: mainPrompt
-        };
-        setFinalVideo(finalVideoData);
-        
-        setCurrentStatus('Hoàn tất! Video của bạn đã sẵn sàng để xem.');
-        setIsProcessing(false);
     };
 
     return (
@@ -154,13 +141,8 @@ export default function App() {
                     {scenes.length > 0 ? (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                             {scenes.map(scene => (
-                                <div key={scene.id} className="aspect-video bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-700 flex flex-col items-center justify-center relative">
+                                <div key={scene.id} className="aspect-video bg-gray-800 rounded-lg overflow-hidden border-2 border-green-500 flex flex-col items-center justify-center relative">
                                     <img src={scene.thumbnailUrl} alt={scene.description} className="w-full h-full object-cover"/>
-                                    {scene.status === 'generating' && (
-                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                            <Loader className="w-8 h-8 animate-spin text-cyan-300" />
-                                        </div>
-                                    )}
                                     <p className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs text-center p-1.5 truncate">
                                         {scene.description}
                                     </p>
