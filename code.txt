@@ -1,0 +1,184 @@
+import React, { useState, useEffect } from 'react';
+import { Film, Sparkles, Loader, Clapperboard, Download } from 'lucide-react';
+
+// --- Helper Functions & Simulation Data ---
+
+// This function simulates the AI breaking down a main prompt into smaller scenes.
+const generateScenesFromPrompt = (prompt) => {
+    if (!prompt) return [];
+    // A more advanced AI would use NLP. Here, we split by commas or sentences.
+    const parts = prompt.split(/[,.।;]/).filter(p => p.trim().length > 3);
+    if (parts.length === 0) parts.push(prompt); // Use the whole prompt if no separators
+
+    return parts.map((part, i) => ({
+        id: `scene_${Date.now()}_${i}`,
+        description: `Cảnh ${i + 1}: ${part.trim()}`,
+        status: 'pending', // 'pending', 'generating', 'done', 'error'
+        thumbnailUrl: `https://placehold.co/400x225/1a1a1a/444444?text=Chờ+tạo...`,
+        videoUrl: null,
+    }));
+};
+
+// --- Main App Component ---
+export default function App() {
+    const [mainPrompt, setMainPrompt] = useState('');
+    const [scenes, setScenes] = useState([]);
+    const [finalVideo, setFinalVideo] = useState(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [currentStatus, setCurrentStatus] = useState('Hãy nhập ý tưởng của bạn và bắt đầu sáng tạo.');
+
+    const handleStartGeneration = async () => {
+        if (!mainPrompt || isProcessing) return;
+
+        setIsProcessing(true);
+        setFinalVideo(null);
+        
+        // 1. Deconstruct Prompt into Scenes
+        setCurrentStatus('Đang phân tích ý tưởng và chia thành các phân cảnh...');
+        const initialScenes = generateScenesFromPrompt(mainPrompt);
+        setScenes(initialScenes);
+        await new Promise(res => setTimeout(res, 1500));
+
+        // 2. Generate each scene sequentially
+        const generatedScenes = [];
+        for (let i = 0; i < initialScenes.length; i++) {
+            const currentScene = initialScenes[i];
+            
+            // Update scene status to 'generating'
+            setScenes(prev => prev.map(s => s.id === currentScene.id ? { ...s, status: 'generating' } : s));
+            setCurrentStatus(`Đang tạo [Cảnh ${i + 1}/${initialScenes.length}]: ${currentScene.description.split(': ')[1]}`);
+            
+            // Simulate generation time
+            await new Promise(res => setTimeout(res, 2000 + Math.random() * 1500));
+
+            const newSceneData = {
+                ...currentScene,
+                status: 'done',
+                thumbnailUrl: `https://placehold.co/400x225/3a3a9a/ffffff?text=${encodeURIComponent(`Cảnh ${i+1} OK`)}`,
+                videoUrl: `https://placehold.co/1280x720/1e1e5e/ffffff?text=${encodeURIComponent(currentScene.description)}`
+            };
+            generatedScenes.push(newSceneData);
+
+            // Update scene status to 'done'
+            setScenes(prev => prev.map(s => s.id === currentScene.id ? newSceneData : s));
+        }
+
+        // 3. Stitching the final video
+        setCurrentStatus('Tất cả các cảnh đã xong. Đang ghép thành một video duy nhất...');
+        await new Promise(res => setTimeout(res, 2500));
+        
+        const finalVideoData = {
+            url: `https://placehold.co/1280x720/000000/ffffff?text=${encodeURIComponent('Video Hoàn Chỉnh: ' + mainPrompt)}`,
+            title: mainPrompt
+        };
+        setFinalVideo(finalVideoData);
+        
+        setCurrentStatus('Hoàn tất! Video của bạn đã sẵn sàng để xem.');
+        setIsProcessing(false);
+    };
+
+    return (
+        <div className="bg-gray-900 text-white min-h-screen font-sans">
+            <div className="container mx-auto p-4 md:p-8">
+                
+                {/* Header */}
+                <header className="flex items-center justify-between mb-8 border-b border-gray-700 pb-4">
+                    <div className="flex items-center gap-3">
+                        <Clapperboard className="w-8 h-8 text-cyan-400" />
+                        <h1 className="text-2xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-indigo-500">
+                            AI Video Composer
+                        </h1>
+                    </div>
+                </header>
+
+                <main className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
+                    {/* Left Column: Input and Scenes */}
+                    <div className="lg:col-span-2 flex flex-col gap-6">
+                        <div className="bg-gray-800 p-5 rounded-xl shadow-lg">
+                            <label htmlFor="main-prompt" className="text-lg font-semibold mb-2 block text-cyan-300">
+                               1. Nhập ý tưởng chính
+                            </label>
+                            <textarea
+                                id="main-prompt"
+                                className="w-full h-36 p-3 bg-gray-900 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 transition-all text-gray-200 placeholder-gray-500"
+                                placeholder="Ví dụ: Một con tàu vũ trụ bay qua các vành đai sao Thổ, đáp xuống một hành tinh băng giá, khám phá một thành phố pha lê dưới lòng đất."
+                                value={mainPrompt}
+                                onChange={(e) => setMainPrompt(e.target.value)}
+                                disabled={isProcessing}
+                            />
+                        </div>
+                        <button
+                            onClick={handleStartGeneration}
+                            disabled={isProcessing || !mainPrompt}
+                            className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-600 hover:to-indigo-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-bold py-4 px-4 rounded-lg transition-all shadow-lg hover:shadow-cyan-500/30 text-lg"
+                        >
+                            {isProcessing ? <Loader className="animate-spin" /> : <Sparkles />}
+                            <span>{isProcessing ? 'Đang xử lý...' : 'Tạo Video Ma Thuật'}</span>
+                        </button>
+                    </div>
+
+                    {/* Right Column: Preview and Final Output */}
+                    <div className="lg:col-span-3 flex flex-col gap-6">
+                        <div className="bg-gray-800 p-5 rounded-xl shadow-lg flex-grow">
+                             <h2 className="text-lg font-semibold mb-4 text-cyan-300">2. Xem trước và Kết quả</h2>
+                             <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative border border-gray-700">
+                                {finalVideo ? (
+                                    <img src={finalVideo.url} alt={finalVideo.title} className="max-w-full max-h-full rounded-md object-contain" />
+                                ) : (
+                                    <div className="text-center text-gray-500 p-4">
+                                        <Film className="w-16 h-16 mx-auto mb-4" />
+                                        <p className="font-semibold">Video hoàn chỉnh sẽ xuất hiện ở đây</p>
+                                        {isProcessing && <p className="text-sm mt-2">{currentStatus}</p>}
+                                    </div>
+                                )}
+                                 {isProcessing && !finalVideo && (
+                                     <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-center p-4 rounded-lg">
+                                        <Loader className="w-12 h-12 animate-spin text-cyan-400 mb-4" />
+                                    </div>
+                                 )}
+                             </div>
+                        </div>
+                        {finalVideo && (
+                            <button className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-all">
+                                <Download className="w-5 h-5"/>
+                                Tải Video Hoàn Chỉnh
+                            </button>
+                        )}
+                    </div>
+                </main>
+                
+                {/* Scene Gallery */}
+                <section className="mt-8">
+                    <h3 className="text-xl font-semibold mb-4 text-cyan-300">3. Các phân cảnh đã tạo</h3>
+                    {scenes.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            {scenes.map(scene => (
+                                <div key={scene.id} className="aspect-video bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-700 flex flex-col items-center justify-center relative">
+                                    <img src={scene.thumbnailUrl} alt={scene.description} className="w-full h-full object-cover"/>
+                                    {scene.status === 'generating' && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <Loader className="w-8 h-8 animate-spin text-cyan-300" />
+                                        </div>
+                                    )}
+                                    <p className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs text-center p-1.5 truncate">
+                                        {scene.description}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                         <div className="text-center py-10 bg-gray-800 rounded-lg text-gray-500">
+                            Các phân cảnh sẽ được tạo ra ở đây sau khi bạn nhập ý tưởng.
+                        </div>
+                    )}
+                </section>
+                
+                 {/* Status Bar */}
+                 <footer className="mt-8 text-center p-4 bg-gray-800 rounded-lg text-sm text-cyan-200">
+                    <p><strong>Trạng thái:</strong> {currentStatus}</p>
+                </footer>
+            </div>
+        </div>
+    );
+}
