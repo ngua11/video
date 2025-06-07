@@ -7,7 +7,7 @@ import { Film, Sparkles, Loader, Clapperboard, Download } from 'lucide-react';
 // 2. Trước khi triển khai lên Vercel, bạn PHẢI triển khai máy chủ lên một dịch vụ như Render,
 //    sau đó lấy URL của máy chủ đó và thay thế vào đây.
 //    Ví dụ: const SERVER_URL = 'https://your-server-name.onrender.com';
-const SERVER_URL = 'http://localhost:3001';
+const SERVER_URL = 'https://video-vnx8.onrender.com';
 
 
 // --- Main App Component ---
